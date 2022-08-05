@@ -1,0 +1,9 @@
+[submodule "lib/KMqtt"]
+	path = lib/KMqtt
+	url = https://github.com/uid01089/KMqtt.git
+[submodule "lib/KSchedule"]
+	path = lib/KSchedule
+	url = https://github.com/uid01089/KSchedule.git
+[submodule "lib/KUtil"]
+	path = lib/KUtil
+	url = https://github.com/uid01089/KUtil.git
