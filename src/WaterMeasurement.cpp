@@ -1,10 +1,9 @@
 #include "WaterMeasurement.h"
 #include <functional>
-#include <ESP8266WiFi.h>
 
-#define MQTT_TRANSMIT_CTL_ANALOG "/heizung/wasseruhr/control/rawvalue"
-#define MQTT_TRANSMIT_CTL_LOGIC "/heizung/wasseruhr/control/logicvalue"
-#define MQTT_TRANSMIT_CTL_ADAPT "/heizung/wasseruhr/control/adapt"
+#define MQTT_TRANSMIT_CTL_ANALOG "/control/rawvalue"
+#define MQTT_TRANSMIT_CTL_LOGIC "/control/logicvalue"
+#define MQTT_TRANSMIT_CTL_ADAPT "/control/adapt"
 #define IR_INPUT A0
 #define SWITCH_ON D2
 #define NR_CYCLES_BEFORE_ADAPTATION 5
@@ -13,11 +12,9 @@
 #define TRIGGER_LOW_LIMIT_PER (unsigned int)20
 #define TRIGGER_HIGH_LIMIT_PER (unsigned int)20
 
-Watermeasurement::Watermeasurement(KMqtt &kmqtt, KSchedule &kschedule, NTPClient &timeClient)
+Watermeasurement::Watermeasurement(KStandardCore *kStandardCore)
 {
-    this->kmqtt = &kmqtt;
-    this->kschedule = &kschedule;
-    this->timeClient = &timeClient;
+    this->kStandardCore = kStandardCore;
 }
 
 Watermeasurement::~Watermeasurement()
@@ -34,9 +31,9 @@ void Watermeasurement::setup()
 
     trigger.setup(TRIGGER_LOW_LIMIT, TRIGGER_HIGH_LIMIT, TRIGGER_LOW_LIMIT_PER, TRIGGER_HIGH_LIMIT_PER);
 
-    kmqtt->regCallBack(MQTT_TRANSMIT_CTL_ANALOG, std::bind(&Watermeasurement::mqttAnalog, this, std::placeholders::_1));
-    kmqtt->regCallBack(MQTT_TRANSMIT_CTL_LOGIC, std::bind(&Watermeasurement::mqttDigital, this, std::placeholders::_1));
-    kmqtt->regCallBack(MQTT_TRANSMIT_CTL_ADAPT, std::bind(&Watermeasurement::mqttAdaptation, this, std::placeholders::_1));
+    kStandardCore->getKMqtt()->regCallBack("/" + kStandardCore->getHostname() + MQTT_TRANSMIT_CTL_ANALOG, std::bind(&Watermeasurement::mqttAnalog, this, std::placeholders::_1));
+    kStandardCore->getKMqtt()->regCallBack("/" + kStandardCore->getHostname() + MQTT_TRANSMIT_CTL_LOGIC, std::bind(&Watermeasurement::mqttDigital, this, std::placeholders::_1));
+    kStandardCore->getKMqtt()->regCallBack("/" + kStandardCore->getHostname() + MQTT_TRANSMIT_CTL_ADAPT, std::bind(&Watermeasurement::mqttAdaptation, this, std::placeholders::_1));
 
     clcWaterMeasurement_500ms();
 }
@@ -52,12 +49,12 @@ void Watermeasurement::clcWaterMeasurement_500ms(void)
 
     if (publishRawValues)
     {
-        kmqtt->publish("/heizung/wasseruhr/rawvalue", String(distance).c_str());
+        kStandardCore->getKMqtt()->publish("/" + kStandardCore->getHostname() + "/rawvalue", String(distance).c_str());
     }
 
     if (publishLogicValues)
     {
-        kmqtt->publish("/heizung/wasseruhr/logic", String(logicalValue).c_str());
+        kStandardCore->getKMqtt()->publish("/" + kStandardCore->getHostname() + "/logic", String(logicalValue).c_str());
     }
 
     // Check if complete cycle
@@ -65,18 +62,16 @@ void Watermeasurement::clcWaterMeasurement_500ms(void)
     {
         // We have one complete cylce, do the needful things
 
-        kmqtt->publish("/heizung/wasseruhr/one_litre_tick", "1");
+        kStandardCore->getKMqtt()->publish("/" + kStandardCore->getHostname() + "/one_litre_tick", "1");
 
-        timeClient->update();
-        kmqtt->publish("/heizung/wasseruhr/time", timeClient->getFormattedTime().c_str());
+        kStandardCore->getNTPClient()->update();
+        kStandardCore->getKMqtt()->publish("/" + kStandardCore->getHostname() + "/time", kStandardCore->getNTPClient()->getTimeString().c_str());
 
-        kmqtt->publish("/heizung/wasseruhr/rssi", String(WiFi.RSSI()).c_str());
-
-        kmqtt->publish("/heizung/wasseruhr/highlimit", String(trigger.getHighLimit()).c_str());
-        kmqtt->publish("/heizung/wasseruhr/lowlimit", String(trigger.getLowLimit()).c_str());
-        kmqtt->publish("/heizung/wasseruhr/maxvalue", String(trigger.getMaxValue()).c_str());
-        kmqtt->publish("/heizung/wasseruhr/minvalue", String(trigger.getMinValue()).c_str());
-        kmqtt->publish("/heizung/wasseruhr/waitCycleCtrForAdaptation", String(waitCycleCtrForAdaptation).c_str());
+        kStandardCore->getKMqtt()->publish("/" + kStandardCore->getHostname() + "/highlimit", String(trigger.getHighLimit()).c_str());
+        kStandardCore->getKMqtt()->publish("/" + kStandardCore->getHostname() + "/lowlimit", String(trigger.getLowLimit()).c_str());
+        kStandardCore->getKMqtt()->publish("/" + kStandardCore->getHostname() + "/maxvalue", String(trigger.getMaxValue()).c_str());
+        kStandardCore->getKMqtt()->publish("/" + kStandardCore->getHostname() + "/minvalue", String(trigger.getMinValue()).c_str());
+        kStandardCore->getKMqtt()->publish("/" + kStandardCore->getHostname() + "/waitCycleCtrForAdaptation", String(waitCycleCtrForAdaptation).c_str());
 
         if (waitCycleCtrForAdaptation == 0)
         {
@@ -89,7 +84,7 @@ void Watermeasurement::clcWaterMeasurement_500ms(void)
     }
 
     // Reschedule it again
-    kschedule->schedule(std::bind(&Watermeasurement::clcWaterMeasurement_500ms, this), 500);
+    kStandardCore->getKSchedule()->schedule(std::bind(&Watermeasurement::clcWaterMeasurement_500ms, this), 500);
 }
 
 void Watermeasurement::mqttAnalog(String value)
@@ -120,6 +115,12 @@ void Watermeasurement::mqttDigital(String value)
 
 void Watermeasurement::mqttAdaptation(String value)
 {
+
+    kStandardCore->getKMqtt()->publish("/" + kStandardCore->getHostname() + "/highlimit", String(trigger.getHighLimit()).c_str());
+    kStandardCore->getKMqtt()->publish("/" + kStandardCore->getHostname() + "/lowlimit", String(trigger.getLowLimit()).c_str());
+    kStandardCore->getKMqtt()->publish("/" + kStandardCore->getHostname() + "/maxvalue", String(trigger.getMaxValue()).c_str());
+    kStandardCore->getKMqtt()->publish("/" + kStandardCore->getHostname() + "/minvalue", String(trigger.getMinValue()).c_str());
+
     if (value == "true")
     {
         waitCycleCtrForAdaptation = NR_CYCLES_BEFORE_ADAPTATION;

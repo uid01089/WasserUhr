@@ -3,10 +3,9 @@
 #define WATER_DETECTION_INPUT D5
 #define WATER_DETECTION_GND D1
 
-Waterdetection::Waterdetection(KMqtt &kmqtt, KSchedule &kschedule)
+Waterdetection::Waterdetection(KStandardCore *kStandardCore)
 {
-    this->kmqtt = &kmqtt;
-    this->kschedule = &kschedule;
+    this->kStandardCore = kStandardCore;
 }
 Waterdetection::~Waterdetection() {}
 
@@ -24,8 +23,8 @@ void Waterdetection::loop() {}
 void Waterdetection::clcWaterDetection_5s()
 {
     int waterDetected = digitalRead(WATER_DETECTION_INPUT);
-    kmqtt->publish("/heizung/wasseruhr/waterdetection", String(waterDetected).c_str());
+    kStandardCore->getKMqtt()->publish("/" + kStandardCore->getHostname() + "/waterdetection", String(waterDetected).c_str());
 
     // Reschedule it again
-    kschedule->schedule(std::bind(&Waterdetection::clcWaterDetection_5s, this), 5000);
+    kStandardCore->getKSchedule()->schedule(std::bind(&Waterdetection::clcWaterDetection_5s, this), 5000);
 }
