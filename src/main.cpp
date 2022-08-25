@@ -4,6 +4,8 @@
 #include <Waterdetection.h>
 #include "incredential.h"
 
+#include <Ticker.h>
+
 // https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/
 
 KStandardCore kStandardCore;
@@ -27,8 +29,6 @@ void setup()
 void loop()
 {
   kStandardCore.loop();
-
   watermeasurement.loop();
   waterdetection.loop();
-  delay(100);
 }
