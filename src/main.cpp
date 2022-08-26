@@ -4,11 +4,12 @@
 #include <Waterdetection.h>
 #include "incredential.h"
 
-#include <Ticker.h>
+#include <KBlink.h>
 
 // https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/
 
 KStandardCore kStandardCore;
+KBlink kblink;
 
 Watermeasurement watermeasurement(&kStandardCore);
 Waterdetection waterdetection(&kStandardCore);
@@ -24,11 +25,15 @@ void setup()
 
   waterdetection.setup();
   Serial.print("Waterdetection start done\n");
+  
+  kblink.setup(kStandardCore.getKSchedule(), 100, 3000);
+
 }
 
 void loop()
 {
   kStandardCore.loop();
+  kblink.loop();
   watermeasurement.loop();
   waterdetection.loop();
 }
